@@ -4,43 +4,56 @@ import express from "express";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 
-const server = new McpServer({
-  name: "docs-fetcher",
-  version: "1.0.0",
-});
+// Factory function to create a configured MCP server
+function createMcpServer() {
+  const server = new McpServer({
+    name: "docs-fetcher",
+    version: "1.0.0",
+  });
 
-// Register the fetch_github_readme tool
-server.registerTool(
-  "fetch_github_readme",
-  {
-    description: "Fetch README from a public GitHub repo",
-    inputSchema: {
-      owner: z.string().describe("GitHub repository owner/organization"),
-      repo: z.string().describe("GitHub repository name"),
+  // Register the fetch_github_readme tool
+  server.registerTool(
+    "fetch_github_readme",
+    {
+      description: "Fetch README from a public GitHub repo",
+      inputSchema: {
+        owner: z.string().describe("GitHub repository owner/organization"),
+        repo: z.string().describe("GitHub repository name"),
+      },
     },
-  },
-  async ({ owner, repo }) => {
-    const url = `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`;
+    async ({ owner, repo }) => {
+      const url = `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`;
 
-    const res = await fetch(url);
-    if (!res.ok) {
-      // Try master branch as fallback
-      const masterUrl = `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`;
-      const masterRes = await fetch(masterUrl);
+      const res = await fetch(url);
+      if (!res.ok) {
+        // Try master branch as fallback
+        const masterUrl = `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`;
+        const masterRes = await fetch(masterUrl);
 
-      if (!masterRes.ok) {
+        if (!masterRes.ok) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Failed to fetch README from ${owner}/${repo}. The repository may not exist, be private, or have a README in a different location.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const text = await masterRes.text();
         return {
           content: [
             {
               type: "text",
-              text: `Failed to fetch README from ${owner}/${repo}. The repository may not exist, be private, or have a README in a different location.`,
+              text: text.slice(0, 5000), // truncate for safety
             },
           ],
-          isError: true,
         };
       }
 
-      const text = await masterRes.text();
+      const text = await res.text();
       return {
         content: [
           {
@@ -50,25 +63,17 @@ server.registerTool(
         ],
       };
     }
+  );
 
-    const text = await res.text();
-    return {
-      content: [
-        {
-          type: "text",
-          text: text.slice(0, 5000), // truncate for safety
-        },
-      ],
-    };
-  }
-);
+  return server;
+}
 
 // Setup Express app with HTTP transport
 const app = express();
 app.use(express.json());
 
-// Store transports by session ID for proper session management
-const transports = new Map();
+// Store sessions: { server, transport }
+const sessions = new Map();
 
 // Health check endpoint
 app.get("/health", (req, res) => {
@@ -77,50 +82,66 @@ app.get("/health", (req, res) => {
 
 // MCP endpoint - handles POST requests
 app.post("/mcp", async (req, res) => {
-  const sessionId = req.headers["mcp-session-id"] || randomUUID();
+  const sessionId = req.headers["mcp-session-id"];
   
-  let transport = transports.get(sessionId);
+  // Check if we have an existing session
+  let session = sessionId ? sessions.get(sessionId) : null;
   
-  if (!transport) {
-    transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => sessionId,
-      enableJsonResponse: true,
-    });
-    transports.set(sessionId, transport);
-    
-    // Clean up on close
-    res.on("close", () => {
-      transports.delete(sessionId);
-      transport.close();
-    });
-    
-    await server.connect(transport);
+  if (session) {
+    // Reuse existing session's transport
+    await session.transport.handleRequest(req, res, req.body);
+    return;
   }
   
+  // Create new server and transport for new sessions
+  const server = createMcpServer();
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => randomUUID(),
+    enableJsonResponse: true,
+  });
+  
+  // Connect the server to this transport
+  await server.connect(transport);
+  
+  // Handle the request
   await transport.handleRequest(req, res, req.body);
+  
+  // Store the session by its ID for future requests
+  const newSessionId = transport.sessionId;
+  if (newSessionId) {
+    sessions.set(newSessionId, { server, transport });
+    
+    // Set up cleanup after 30 minutes of inactivity
+    setTimeout(() => {
+      if (sessions.has(newSessionId)) {
+        sessions.get(newSessionId).transport.close();
+        sessions.delete(newSessionId);
+      }
+    }, 30 * 60 * 1000);
+  }
 });
 
 // Handle GET requests for SSE streams (optional, for backwards compatibility)
 app.get("/mcp", async (req, res) => {
   const sessionId = req.headers["mcp-session-id"];
   
-  if (!sessionId || !transports.has(sessionId)) {
+  if (!sessionId || !sessions.has(sessionId)) {
     res.status(400).json({ error: "Invalid or missing session ID" });
     return;
   }
   
-  const transport = transports.get(sessionId);
-  await transport.handleRequest(req, res);
+  const session = sessions.get(sessionId);
+  await session.transport.handleRequest(req, res);
 });
 
 // Handle DELETE for session cleanup
 app.delete("/mcp", async (req, res) => {
   const sessionId = req.headers["mcp-session-id"];
   
-  if (sessionId && transports.has(sessionId)) {
-    const transport = transports.get(sessionId);
-    transport.close();
-    transports.delete(sessionId);
+  if (sessionId && sessions.has(sessionId)) {
+    const session = sessions.get(sessionId);
+    session.transport.close();
+    sessions.delete(sessionId);
   }
   
   res.status(204).end();
