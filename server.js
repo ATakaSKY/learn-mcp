@@ -25,12 +25,12 @@ function createMcpServer() {
       // Try multiple branch names and README filename variations
       const branches = ["main", "master", "canary"];
       const filenames = ["README.md", "readme.md", "Readme.md"];
-      
+
       for (const branch of branches) {
         for (const filename of filenames) {
           const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filename}`;
           const res = await fetch(url);
-          
+
           if (res.ok) {
             const text = await res.text();
             return {
@@ -44,7 +44,7 @@ function createMcpServer() {
           }
         }
       }
-      
+
       // If none of the combinations worked
       return {
         content: [
@@ -76,15 +76,6 @@ app.get("/health", (req, res) => {
 // MCP endpoint - handles POST requests
 app.post("/mcp", async (req, res) => {
   const sessionId = req.headers["mcp-session-id"];
-
-  console.log("sessionId", sessionId);
-  console.log("req.body", req.body);
-
-  console.log("req.headers", req.headers);
-
-  console.log("req.method", req.method);
-
-  console.log("req.url", req.url);
 
   // Check if we have an existing session
   let session = sessionId ? sessions.get(sessionId) : null;
