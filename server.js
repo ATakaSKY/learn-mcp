@@ -22,45 +22,38 @@ function createMcpServer() {
       },
     },
     async ({ owner, repo }) => {
-      const url = `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`;
-
-      const res = await fetch(url);
-      if (!res.ok) {
-        // Try master branch as fallback
-        const masterUrl = `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`;
-        const masterRes = await fetch(masterUrl);
-
-        if (!masterRes.ok) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Failed to fetch README from ${owner}/${repo}. The repository may not exist, be private, or have a README in a different location.`,
-              },
-            ],
-            isError: true,
-          };
+      // Try multiple branch names and README filename variations
+      const branches = ["main", "master", "canary"];
+      const filenames = ["README.md", "readme.md", "Readme.md"];
+      
+      for (const branch of branches) {
+        for (const filename of filenames) {
+          const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filename}`;
+          const res = await fetch(url);
+          
+          if (res.ok) {
+            const text = await res.text();
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: text.slice(0, 5000), // truncate for safety
+                },
+              ],
+            };
+          }
         }
-
-        const text = await masterRes.text();
-        return {
-          content: [
-            {
-              type: "text",
-              text: text.slice(0, 5000), // truncate for safety
-            },
-          ],
-        };
       }
-
-      const text = await res.text();
+      
+      // If none of the combinations worked
       return {
         content: [
           {
             type: "text",
-            text: text.slice(0, 5000), // truncate for safety
+            text: `Failed to fetch README from ${owner}/${repo}. The repository may not exist, be private, or have a README in a different location.`,
           },
         ],
+        isError: true,
       };
     },
   );
