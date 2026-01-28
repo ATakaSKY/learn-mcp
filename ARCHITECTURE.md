@@ -38,7 +38,7 @@ flowchart TB
 
     subgraph Deployment["Deployment"]
         Docker["Docker Container"]
-        Fly["Fly.io"]
+        Render["Render.com"]
     end
 
     Cursor -->|"HTTP POST/GET"| MCP
@@ -48,7 +48,7 @@ flowchart TB
     McpServer --> Sessions
     McpServer --> FetchReadme
     FetchReadme -->|"HTTPS"| GitHub
-    Docker --> Fly
+    Docker --> Render
 ```
 
 ## Component Details
@@ -128,31 +128,73 @@ flowchart LR
     end
 
     subgraph Production
-        subgraph Fly["Fly.io (sjc region)"]
-            VM["Shared CPU VM<br/>256MB RAM"]
+        subgraph Render["Render.com"]
+            WebService["Web Service"]
             Docker["Docker Container<br/>Node 22 Alpine"]
         end
     end
 
-    Local -->|"fly deploy"| Fly
+    subgraph Source["Source Control"]
+        GitHub["GitHub Repo"]
+    end
+
+    Local -->|"git push"| GitHub
+    GitHub -->|"Auto Deploy"| Render
     
     subgraph Config
-        FlyToml["fly.toml"]
         Dockerfile["Dockerfile"]
     end
 
-    Config --> Fly
+    Config --> Render
 ```
+
+### Deployment Steps
+
+1. **Push to GitHub** - Push your code to a GitHub repository
+2. **Create Web Service** - Go to [Render Dashboard](https://dashboard.render.com/) → New → Web Service
+3. **Connect Repository** - Select your GitHub repo
+4. **Configure Service**:
+   - **Environment**: Docker
+   - **Region**: Choose nearest region (e.g., Oregon, Frankfurt)
+   - **Instance Type**: Free or Starter
+   - **Start Command**: Auto-detected from Dockerfile
+5. **Deploy** - Render auto-builds and deploys on every push
 
 ### Deployment Configuration
 
 | Setting | Value | Description |
 |---------|-------|-------------|
-| Region | `sjc` | San Jose, California |
-| Memory | 256MB | Shared CPU instance |
-| Auto-stop | Enabled | Stops when idle |
-| Auto-start | Enabled | Starts on request |
-| HTTPS | Forced | All traffic over HTTPS |
+| Platform | Render.com | Cloud application hosting |
+| Build | Docker | Uses Dockerfile for builds |
+| Auto-deploy | Enabled | Deploys on git push to main |
+| HTTPS | Automatic | Free SSL certificates |
+| Health Check | `/health` | Monitors service availability |
+
+### Environment Variables
+
+Configure these in Render Dashboard → Environment:
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `PORT` | `3000` | Server port (auto-set by Render) |
+
+### Render Service URL
+
+After deployment, your MCP server will be available at:
+```
+https://your-service-name.onrender.com/mcp
+```
+
+Update your Cursor MCP settings to use this URL:
+```json
+{
+  "mcpServers": {
+    "docs-fetcher": {
+      "url": "https://your-service-name.onrender.com/mcp"
+    }
+  }
+}
+```
 
 ## Dependencies
 
