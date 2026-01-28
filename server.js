@@ -1,8 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import express from "express";
-import { z } from "zod";
 import { randomUUID } from "crypto";
+
+// Import tool definitions
+import { githubTools } from "./tools/github.js";
+import { npmTools } from "./tools/npm.js";
+import { docsTools } from "./tools/docs.js";
+
+// Combine all tools
+const allTools = [...githubTools, ...npmTools, ...docsTools];
 
 // Factory function to create a configured MCP server
 function createMcpServer() {
@@ -11,52 +18,17 @@ function createMcpServer() {
     version: "1.0.0",
   });
 
-  // Register the fetch_github_readme tool
-  server.registerTool(
-    "fetch_github_readme",
-    {
-      description: "Fetch README from a public GitHub repo",
-      inputSchema: {
-        owner: z.string().describe("GitHub repository owner/organization"),
-        repo: z.string().describe("GitHub repository name"),
+  // Register all tools
+  for (const tool of allTools) {
+    server.registerTool(
+      tool.name,
+      {
+        description: tool.description,
+        inputSchema: tool.inputSchema,
       },
-    },
-    async ({ owner, repo }) => {
-      // Try multiple branch names and README filename variations
-      const branches = ["main", "master", "canary"];
-      const filenames = ["README.md", "readme.md", "Readme.md"];
-
-      for (const branch of branches) {
-        for (const filename of filenames) {
-          const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filename}`;
-          const res = await fetch(url);
-
-          if (res.ok) {
-            const text = await res.text();
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: text.slice(0, 5000), // truncate for safety
-                },
-              ],
-            };
-          }
-        }
-      }
-
-      // If none of the combinations worked
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Failed to fetch README from ${owner}/${repo}. The repository may not exist, be private, or have a README in a different location.`,
-          },
-        ],
-        isError: true,
-      };
-    },
-  );
+      tool.handler,
+    );
+  }
 
   return server;
 }
@@ -70,7 +42,12 @@ const sessions = new Map();
 
 // Health check endpoint
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", server: "docs-fetcher", version: "1.0.0" });
+  res.json({
+    status: "ok",
+    server: "docs-fetcher",
+    version: "1.0.0",
+    tools: allTools.map((t) => t.name),
+  });
 });
 
 // MCP endpoint - handles POST requests
@@ -150,4 +127,6 @@ app.listen(PORT, () => {
     `🚀 MCP Server "docs-fetcher" running on http://localhost:${PORT}/mcp`,
   );
   console.log(`📋 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔧 Tools available: ${allTools.length}`);
+  allTools.forEach((t) => console.log(`   - ${t.name}`));
 });

@@ -1,26 +1,22 @@
 # docs-fetcher MCP Server
 
-An MCP (Model Context Protocol) server that fetches README files from public GitHub repositories.
+A comprehensive MCP (Model Context Protocol) server for fetching developer documentation from GitHub, npm, and the web.
 
-## Installation
+## Quick Start
 
 ```bash
+# Install dependencies
 npm install
-```
 
-## Usage
-
-### Running Locally (HTTP Server)
-
-```bash
+# Start the server
 npm start
 ```
 
-The server will start at `http://localhost:3000/mcp`
+The server runs at `http://localhost:3000/mcp`
 
-### Configuring with Cursor (Remote HTTP)
+### Configure with Cursor
 
-Add this to your Cursor MCP settings (`.cursor/mcp.json`):
+Add to your `.cursor/mcp.json`:
 
 ```json
 {
@@ -32,69 +28,65 @@ Add this to your Cursor MCP settings (`.cursor/mcp.json`):
 }
 ```
 
-For a deployed server, replace `localhost:3000` with your server URL.
+## Available Tools
 
-## Deployment Options
+### GitHub Tools
 
-### 1. Docker
+| Tool | What to ask |
+|------|-------------|
+| `fetch_github_readme` | "Fetch the README from TanStack/query" |
+| `fetch_github_file` | "Get the package.json from facebook/react" |
+| `get_repo_info` | "How many stars does vercel/next.js have?" |
+| `list_repo_contents` | "What files are in the src folder of TanStack/router?" |
+| `get_github_releases` | "What's new in the latest releases of prisma/prisma?" |
 
-Build and run with Docker:
+### npm Tools
+
+| Tool | What to ask |
+|------|-------------|
+| `get_npm_package` | "Tell me about the zod package" |
+| `search_npm_packages` | "Find React form libraries" |
+| `get_package_versions` | "When was the last version of express released?" |
+
+### Documentation Tools
+
+| Tool | What to ask |
+|------|-------------|
+| `fetch_url_content` | "Fetch the Quick Start guide from https://tanstack.com/..." |
+| `search_mdn` | "How does Promise.allSettled work?" |
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `PORT` | Server port (default: 3000) |
+| `GITHUB_TOKEN` | Optional GitHub token for higher API rate limits (60/hr → 5000/hr) |
+
+## Deployment
+
+### Docker
 
 ```bash
-# Build the image
 docker build -t docs-fetcher-mcp .
-
-# Run the container
 docker run -p 3000:3000 docs-fetcher-mcp
 ```
 
-### 2. Fly.io
+### Cloud Platforms
+
+Works with any Docker-compatible platform:
 
 ```bash
-# Install flyctl if you haven't
-# brew install flyctl
+# Fly.io
+fly launch && fly deploy
 
-# Login to Fly.io
-fly auth login
-
-# Launch the app (first time)
-fly launch
-
-# Deploy updates
-fly deploy
+# Render / Railway
+# Connect your GitHub repo - auto-detects Dockerfile
 ```
 
-### 3. Railway
+## Architecture
 
-1. Push your code to GitHub
-2. Connect Railway to your GitHub repo
-3. Railway will auto-detect the Dockerfile and deploy
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for technical details, diagrams, and internals.
 
-### 4. Render
+## License
 
-1. Create a new Web Service on Render
-2. Connect your GitHub repo
-3. Set the start command to `npm start`
-4. Deploy!
-
-## Endpoints
-
-- `POST /mcp` - Main MCP endpoint for tool calls
-- `GET /health` - Health check endpoint
-
-## Tools
-
-### fetch_github_readme
-
-Fetches the README.md file from a public GitHub repository.
-
-**Parameters:**
-- `owner` (string): GitHub repository owner/organization
-- `repo` (string): GitHub repository name
-
-**Example:**
-```
-Fetch the README for facebook/react
-```
-
-The tool will return the README content (truncated to 5000 characters for safety).
+MIT
