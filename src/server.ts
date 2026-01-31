@@ -10,10 +10,10 @@ import { docsTools } from "./tools/docs.js";
 import type { Session } from "./types/index.js";
 
 // Combine all tools
-const allTools = [...githubTools, ...npmTools, ...docsTools];
+export const allTools = [...githubTools, ...npmTools, ...docsTools];
 
 // Factory function to create a configured MCP server
-function createMcpServer(): McpServer {
+export function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "docs-fetcher",
     version: "1.0.0",
@@ -35,11 +35,11 @@ function createMcpServer(): McpServer {
 }
 
 // Setup Express app with HTTP transport
-const app = express();
+export const app = express();
 app.use(express.json());
 
 // Store sessions: { server, transport }
-const sessions = new Map<string, Session>();
+export const sessions = new Map<string, Session>();
 
 // Health check endpoint
 app.get("/health", (_req: Request, res: Response) => {
@@ -124,11 +124,16 @@ app.delete("/mcp", async (req: Request, res: Response) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(
-    `🚀 MCP Server "docs-fetcher" running on http://localhost:${PORT}/mcp`
-  );
-  console.log(`📋 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔧 Tools available: ${allTools.length}`);
-  allTools.forEach((t) => console.log(`   - ${t.name}`));
-});
+// Only start server when running directly (not when imported for testing)
+const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+
+if (isMainModule) {
+  app.listen(PORT, () => {
+    console.log(
+      `🚀 MCP Server "docs-fetcher" running on http://localhost:${PORT}/mcp`
+    );
+    console.log(`📋 Health check: http://localhost:${PORT}/health`);
+    console.log(`🔧 Tools available: ${allTools.length}`);
+    allTools.forEach((t) => console.log(`   - ${t.name}`));
+  });
+}
