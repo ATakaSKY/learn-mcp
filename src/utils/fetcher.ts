@@ -2,15 +2,22 @@
  * Shared fetch utilities with error handling
  */
 
+import type { FetchResult, McpToolResponse, Headers } from "../types/index.js";
+
 const DEFAULT_TIMEOUT = 10000; // 10 seconds
+
+interface FetchOptions extends RequestInit {
+  timeout?: number;
+  headers?: Headers;
+}
 
 /**
  * Fetch with timeout and error handling
- * @param {string} url - URL to fetch
- * @param {object} options - Fetch options
- * @returns {Promise<Response>}
  */
-export async function fetchWithTimeout(url, options = {}) {
+export async function fetchWithTimeout(
+  url: string,
+  options: FetchOptions = {}
+): Promise<Response> {
   const { timeout = DEFAULT_TIMEOUT, ...fetchOptions } = options;
 
   const controller = new AbortController();
@@ -29,11 +36,11 @@ export async function fetchWithTimeout(url, options = {}) {
 
 /**
  * Fetch JSON with error handling
- * @param {string} url - URL to fetch
- * @param {object} options - Fetch options
- * @returns {Promise<{data: any, error: string|null}>}
  */
-export async function fetchJson(url, options = {}) {
+export async function fetchJson<T = unknown>(
+  url: string,
+  options: FetchOptions = {}
+): Promise<FetchResult<T>> {
   try {
     const response = await fetchWithTimeout(url, options);
 
@@ -44,23 +51,23 @@ export async function fetchJson(url, options = {}) {
       };
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as T;
     return { data, error: null };
   } catch (error) {
-    if (error.name === "AbortError") {
+    if (error instanceof Error && error.name === "AbortError") {
       return { data: null, error: "Request timed out" };
     }
-    return { data: null, error: error.message };
+    return { data: null, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
 /**
  * Fetch text content with error handling
- * @param {string} url - URL to fetch
- * @param {object} options - Fetch options
- * @returns {Promise<{data: string|null, error: string|null}>}
  */
-export async function fetchText(url, options = {}) {
+export async function fetchText(
+  url: string,
+  options: FetchOptions = {}
+): Promise<FetchResult<string>> {
   try {
     const response = await fetchWithTimeout(url, options);
 
@@ -74,19 +81,17 @@ export async function fetchText(url, options = {}) {
     const data = await response.text();
     return { data, error: null };
   } catch (error) {
-    if (error.name === "AbortError") {
+    if (error instanceof Error && error.name === "AbortError") {
       return { data: null, error: "Request timed out" };
     }
-    return { data: null, error: error.message };
+    return { data: null, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
 /**
  * Create an MCP error response
- * @param {string} message - Error message
- * @returns {object} MCP error response
  */
-export function errorResponse(message) {
+export function errorResponse(message: string): McpToolResponse {
   return {
     content: [{ type: "text", text: message }],
     isError: true,
@@ -95,10 +100,8 @@ export function errorResponse(message) {
 
 /**
  * Create an MCP success response
- * @param {string} text - Response text
- * @returns {object} MCP success response
  */
-export function textResponse(text) {
+export function textResponse(text: string): McpToolResponse {
   return {
     content: [{ type: "text", text }],
   };
@@ -106,21 +109,16 @@ export function textResponse(text) {
 
 /**
  * Truncate text to a maximum length
- * @param {string} text - Text to truncate
- * @param {number} maxLength - Maximum length (default 10000)
- * @returns {string}
  */
-export function truncate(text, maxLength = 10000) {
+export function truncate(text: string, maxLength: number = 10000): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + "\n\n... [truncated]";
 }
 
 /**
  * Format bytes to human readable string
- * @param {number} bytes - Number of bytes
- * @returns {string}
  */
-export function formatBytes(bytes) {
+export function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
@@ -130,22 +128,18 @@ export function formatBytes(bytes) {
 
 /**
  * Format number with commas
- * @param {number} num - Number to format
- * @returns {string}
  */
-export function formatNumber(num) {
+export function formatNumber(num: number): string {
   return num.toLocaleString("en-US");
 }
 
 /**
  * Format relative time
- * @param {string|Date} date - Date to format
- * @returns {string}
  */
-export function formatRelativeTime(date) {
+export function formatRelativeTime(date: string | Date): string {
   const now = new Date();
   const then = new Date(date);
-  const diffMs = now - then;
+  const diffMs = now.getTime() - then.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   if (diffDays === 0) return "today";

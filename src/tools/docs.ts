@@ -12,24 +12,50 @@ import {
   textResponse,
   truncate,
 } from "../utils/fetcher.js";
+import type { McpTool } from "../types/index.js";
 
 const MDN_API = "https://developer.mozilla.org/api/v1/search";
+
+interface MdnDocument {
+  title: string;
+  mdn_url: string;
+  summary?: string;
+}
+
+interface MdnSearchResult {
+  documents: MdnDocument[];
+  metadata?: {
+    total?: {
+      value?: number;
+    };
+  };
+}
+
+// Input schemas
+const urlSchema = {
+  url: z.string().url().describe("The URL to fetch content from"),
+};
+
+const querySchema = {
+  query: z
+    .string()
+    .describe("Search query (e.g., 'Array.map', 'flexbox', 'fetch API')"),
+};
 
 /**
  * Tool definitions for documentation
  */
-export const docsTools = [
+export const docsTools: McpTool[] = [
   {
     name: "fetch_url_content",
     description:
       "Fetch and extract readable text content from any URL. Useful for reading documentation pages, blog posts, or articles.",
-    inputSchema: {
-      url: z.string().url().describe("The URL to fetch content from"),
-    },
-    handler: async ({ url }) => {
+    inputSchema: urlSchema,
+    handler: async (args) => {
+      const { url } = args as { url: string };
       const { data: html, error } = await fetchText(url);
 
-      if (error) {
+      if (error || !html) {
         return errorResponse(`Failed to fetch URL: ${error}`);
       }
 
@@ -53,12 +79,12 @@ export const docsTools = [
             const text = body.textContent?.trim();
             if (text) {
               return textResponse(
-                `# Content from ${url}\n\n${truncate(text, 8000)}`,
+                `# Content from ${url}\n\n${truncate(text, 8000)}`
               );
             }
           }
           return errorResponse(
-            "Could not extract readable content from this URL. The page may be JavaScript-rendered or have an unusual structure.",
+            "Could not extract readable content from this URL. The page may be JavaScript-rendered or have an unusual structure."
           );
         }
 
@@ -75,7 +101,8 @@ ${truncate(article.textContent, 8000)}
 
         return textResponse(content);
       } catch (err) {
-        return errorResponse(`Failed to parse page content: ${err.message}`);
+        const message = err instanceof Error ? err.message : String(err);
+        return errorResponse(`Failed to parse page content: ${message}`);
       }
     },
   },
@@ -84,16 +111,13 @@ ${truncate(article.textContent, 8000)}
     name: "search_mdn",
     description:
       "Search MDN Web Docs for JavaScript, HTML, CSS, and Web API documentation",
-    inputSchema: {
-      query: z
-        .string()
-        .describe("Search query (e.g., 'Array.map', 'flexbox', 'fetch API')"),
-    },
-    handler: async ({ query }) => {
+    inputSchema: querySchema,
+    handler: async (args) => {
+      const { query } = args as { query: string };
       const url = `${MDN_API}?q=${encodeURIComponent(query)}&locale=en-US`;
-      const { data, error } = await fetchJson(url);
+      const { data, error } = await fetchJson<MdnSearchResult>(url);
 
-      if (error) {
+      if (error || !data) {
         return errorResponse(`Failed to search MDN: ${error}`);
       }
 

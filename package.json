@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "description": "MCP server for fetching developer documentation from GitHub, npm, and the web",
   "type": "module",
-  "main": "server.js",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node server.js"
+    "dev": "tsx src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "mcp",
@@ -22,5 +25,12 @@
     "express": "^4.21.0",
     "jsdom": "^24.0.0",
     "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^25.1.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

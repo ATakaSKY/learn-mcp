@@ -6,13 +6,20 @@ Technical architecture of the **docs-fetcher** MCP server.
 
 ```
 docs-fetcher/
-├── server.js           # Express server & MCP setup
-├── tools/
-│   ├── github.js       # GitHub tools (5)
-│   ├── npm.js          # npm tools (3)
-│   └── docs.js         # Documentation tools (2)
-├── utils/
-│   └── fetcher.js      # HTTP utilities & formatters
+├── src/
+│   ├── server.ts           # Express server & MCP setup
+│   ├── types/
+│   │   ├── index.ts        # Core MCP types
+│   │   ├── github.ts       # GitHub API types
+│   │   └── npm.ts          # npm API types
+│   ├── tools/
+│   │   ├── github.ts       # GitHub tools (5)
+│   │   ├── npm.ts          # npm tools (3)
+│   │   └── docs.ts         # Documentation tools (2)
+│   └── utils/
+│       └── fetcher.ts      # HTTP utilities & formatters
+├── dist/                   # Compiled JavaScript (generated)
+├── tsconfig.json
 ├── package.json
 └── Dockerfile
 ```
@@ -127,6 +134,8 @@ flowchart LR
 | `zod` | Input validation |
 | `jsdom` | DOM parsing |
 | `@mozilla/readability` | Content extraction |
+| `typescript` | TypeScript compiler (dev) |
+| `tsx` | TypeScript execution (dev) |
 
 ## Deployment
 
