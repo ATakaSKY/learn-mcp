@@ -18,6 +18,24 @@ export default defineConfig({
           branches: 80,
           statements: 80,
         },
+        "src/tools/github.ts": {
+          lines: 80,
+          functions: 80,
+          branches: 80,
+          statements: 80,
+        },
+        "src/tools/npm.ts": {
+          lines: 80,
+          functions: 80,
+          branches: 80,
+          statements: 80,
+        },
+        "src/tools/docs.ts": {
+          lines: 80,
+          functions: 75, // 75% due to internal forEach callback in DOM manipulation
+          branches: 80,
+          statements: 80,
+        },
       },
     },
   },
