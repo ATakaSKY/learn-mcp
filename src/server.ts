@@ -1,18 +1,19 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import express from "express";
+import express, { Request, Response } from "express";
 import { randomUUID } from "crypto";
 
 // Import tool definitions
 import { githubTools } from "./tools/github.js";
 import { npmTools } from "./tools/npm.js";
 import { docsTools } from "./tools/docs.js";
+import type { Session } from "./types/index.js";
 
 // Combine all tools
 const allTools = [...githubTools, ...npmTools, ...docsTools];
 
 // Factory function to create a configured MCP server
-function createMcpServer() {
+function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "docs-fetcher",
     version: "1.0.0",
@@ -26,7 +27,7 @@ function createMcpServer() {
         description: tool.description,
         inputSchema: tool.inputSchema,
       },
-      tool.handler,
+      tool.handler as Parameters<typeof server.registerTool>[2]
     );
   }
 
@@ -38,10 +39,10 @@ const app = express();
 app.use(express.json());
 
 // Store sessions: { server, transport }
-const sessions = new Map();
+const sessions = new Map<string, Session>();
 
 // Health check endpoint
-app.get("/health", (req, res) => {
+app.get("/health", (_req: Request, res: Response) => {
   res.json({
     status: "ok",
     server: "docs-fetcher",
@@ -51,11 +52,11 @@ app.get("/health", (req, res) => {
 });
 
 // MCP endpoint - handles POST requests
-app.post("/mcp", async (req, res) => {
-  const sessionId = req.headers["mcp-session-id"];
+app.post("/mcp", async (req: Request, res: Response) => {
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
   // Check if we have an existing session
-  let session = sessionId ? sessions.get(sessionId) : null;
+  const session = sessionId ? sessions.get(sessionId) : null;
 
   if (session) {
     // Reuse existing session's transport
@@ -84,35 +85,36 @@ app.post("/mcp", async (req, res) => {
     // Set up cleanup after 30 minutes of inactivity
     setTimeout(
       () => {
-        if (sessions.has(newSessionId)) {
-          sessions.get(newSessionId).transport.close();
+        const existingSession = sessions.get(newSessionId);
+        if (existingSession) {
+          existingSession.transport.close();
           sessions.delete(newSessionId);
         }
       },
-      30 * 60 * 1000,
+      30 * 60 * 1000
     );
   }
 });
 
 // Handle GET requests for SSE streams (optional, for backwards compatibility)
-app.get("/mcp", async (req, res) => {
-  const sessionId = req.headers["mcp-session-id"];
+app.get("/mcp", async (req: Request, res: Response) => {
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
   if (!sessionId || !sessions.has(sessionId)) {
     res.status(400).json({ error: "Invalid or missing session ID" });
     return;
   }
 
-  const session = sessions.get(sessionId);
+  const session = sessions.get(sessionId)!;
   await session.transport.handleRequest(req, res);
 });
 
 // Handle DELETE for session cleanup
-app.delete("/mcp", async (req, res) => {
-  const sessionId = req.headers["mcp-session-id"];
+app.delete("/mcp", async (req: Request, res: Response) => {
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
   if (sessionId && sessions.has(sessionId)) {
-    const session = sessions.get(sessionId);
+    const session = sessions.get(sessionId)!;
     session.transport.close();
     sessions.delete(sessionId);
   }
@@ -124,7 +126,7 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(
-    `🚀 MCP Server "docs-fetcher" running on http://localhost:${PORT}/mcp`,
+    `🚀 MCP Server "docs-fetcher" running on http://localhost:${PORT}/mcp`
   );
   console.log(`📋 Health check: http://localhost:${PORT}/health`);
   console.log(`🔧 Tools available: ${allTools.length}`);

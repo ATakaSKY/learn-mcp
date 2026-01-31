@@ -13,6 +13,13 @@ import {
   formatRelativeTime,
   formatBytes,
 } from "../utils/fetcher.js";
+import type { McpTool, Headers } from "../types/index.js";
+import type {
+  GitHubRepo,
+  GitHubLanguages,
+  GitHubRelease,
+  GitHubContentItem,
+} from "../types/github.js";
 
 const GITHUB_API = "https://api.github.com";
 const GITHUB_RAW = "https://raw.githubusercontent.com";
@@ -20,8 +27,8 @@ const GITHUB_RAW = "https://raw.githubusercontent.com";
 /**
  * Get GitHub API headers (with optional token)
  */
-function getHeaders() {
-  const headers = {
+function getHeaders(): Headers {
+  const headers: Headers = {
     Accept: "application/vnd.github.v3+json",
     "User-Agent": "docs-fetcher-mcp/1.0",
   };
@@ -33,25 +40,53 @@ function getHeaders() {
   return headers;
 }
 
+// Input schemas
+const repoSchema = {
+  owner: z.string().describe("GitHub repository owner/organization"),
+  repo: z.string().describe("GitHub repository name"),
+};
+
+const fileSchema = {
+  ...repoSchema,
+  path: z
+    .string()
+    .describe("Path to the file (e.g., 'src/index.ts' or 'package.json')"),
+  branch: z
+    .string()
+    .optional()
+    .describe("Branch name (defaults to 'main', falls back to 'master')"),
+};
+
+const contentsSchema = {
+  ...repoSchema,
+  path: z.string().optional().describe("Directory path (defaults to root)"),
+};
+
+const releasesSchema = {
+  ...repoSchema,
+  count: z
+    .number()
+    .optional()
+    .describe("Number of releases to fetch (default: 5, max: 10)"),
+};
+
 /**
  * Tool definitions for GitHub
  */
-export const githubTools = [
+export const githubTools: McpTool[] = [
   {
     name: "fetch_github_readme",
     description: "Fetch README from a public GitHub repo",
-    inputSchema: {
-      owner: z.string().describe("GitHub repository owner/organization"),
-      repo: z.string().describe("GitHub repository name"),
-    },
-    handler: async ({ owner, repo }) => {
+    inputSchema: repoSchema,
+    handler: async (args) => {
+      const { owner, repo } = args as { owner: string; repo: string };
       const branches = ["main", "master", "canary"];
       const filenames = ["README.md", "readme.md", "Readme.md"];
 
       for (const branch of branches) {
         for (const filename of filenames) {
           const url = `${GITHUB_RAW}/${owner}/${repo}/${branch}/${filename}`;
-          const { data, error } = await fetchText(url);
+          const { data } = await fetchText(url);
 
           if (data) {
             return textResponse(truncate(data, 8000));
@@ -60,7 +95,7 @@ export const githubTools = [
       }
 
       return errorResponse(
-        `Failed to fetch README from ${owner}/${repo}. The repository may not exist, be private, or have a README in a different location.`,
+        `Failed to fetch README from ${owner}/${repo}. The repository may not exist, be private, or have a README in a different location.`
       );
     },
   },
@@ -68,34 +103,28 @@ export const githubTools = [
   {
     name: "fetch_github_file",
     description: "Fetch any file from a public GitHub repository",
-    inputSchema: {
-      owner: z.string().describe("GitHub repository owner/organization"),
-      repo: z.string().describe("GitHub repository name"),
-      path: z
-        .string()
-        .describe("Path to the file (e.g., 'src/index.ts' or 'package.json')"),
-      branch: z
-        .string()
-        .optional()
-        .describe("Branch name (defaults to 'main', falls back to 'master')"),
-    },
-    handler: async ({ owner, repo, path, branch }) => {
+    inputSchema: fileSchema,
+    handler: async (args) => {
+      const { owner, repo, path, branch } = args as {
+        owner: string;
+        repo: string;
+        path: string;
+        branch?: string;
+      };
       const branches = branch ? [branch] : ["main", "master"];
 
       for (const b of branches) {
         const url = `${GITHUB_RAW}/${owner}/${repo}/${b}/${path}`;
-        const { data, error } = await fetchText(url);
+        const { data } = await fetchText(url);
 
         if (data) {
-          // Detect file type for context
-          const ext = path.split(".").pop()?.toLowerCase() || "";
           const header = `File: ${owner}/${repo}/${path} (branch: ${b})\n${"─".repeat(50)}\n\n`;
           return textResponse(header + truncate(data, 8000));
         }
       }
 
       return errorResponse(
-        `Failed to fetch file '${path}' from ${owner}/${repo}. The file may not exist or the repository may be private.`,
+        `Failed to fetch file '${path}' from ${owner}/${repo}. The file may not exist or the repository may be private.`
       );
     },
   },
@@ -103,28 +132,22 @@ export const githubTools = [
   {
     name: "get_repo_info",
     description: "Get metadata and statistics about a GitHub repository",
-    inputSchema: {
-      owner: z.string().describe("GitHub repository owner/organization"),
-      repo: z.string().describe("GitHub repository name"),
-    },
-    handler: async ({ owner, repo }) => {
-      const { data, error } = await fetchJson(
+    inputSchema: repoSchema,
+    handler: async (args) => {
+      const { owner, repo } = args as { owner: string; repo: string };
+      const { data, error } = await fetchJson<GitHubRepo>(
         `${GITHUB_API}/repos/${owner}/${repo}`,
-        {
-          headers: getHeaders(),
-        },
+        { headers: getHeaders() }
       );
 
-      if (error) {
-        return errorResponse(`Failed to fetch repo info: ${error}`);
+      if (error || !data) {
+        return errorResponse(`Failed to fetch repo info: ${error || "received empty response"}`);
       }
 
       // Fetch languages
-      const { data: languages } = await fetchJson(
+      const { data: languages } = await fetchJson<GitHubLanguages>(
         `${GITHUB_API}/repos/${owner}/${repo}/languages`,
-        {
-          headers: getHeaders(),
-        },
+        { headers: getHeaders() }
       );
 
       const languageList = languages
@@ -168,25 +191,26 @@ ${data.has_wiki ? `- 📚 Wiki: ${data.html_url}/wiki` : ""}
   {
     name: "list_repo_contents",
     description: "List files and folders in a GitHub repository directory",
-    inputSchema: {
-      owner: z.string().describe("GitHub repository owner/organization"),
-      repo: z.string().describe("GitHub repository name"),
-      path: z.string().optional().describe("Directory path (defaults to root)"),
-    },
-    handler: async ({ owner, repo, path = "" }) => {
+    inputSchema: contentsSchema,
+    handler: async (args) => {
+      const { owner, repo, path = "" } = args as {
+        owner: string;
+        repo: string;
+        path?: string;
+      };
       const url = `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}`;
-      const { data, error } = await fetchJson(url, {
+      const { data, error } = await fetchJson<GitHubContentItem[] | GitHubContentItem>(url, {
         headers: getHeaders(),
       });
 
-      if (error) {
-        return errorResponse(`Failed to list contents: ${error}`);
+      if (error || !data) {
+        return errorResponse(`Failed to list contents: ${error || "received empty response"}`);
       }
 
       if (!Array.isArray(data)) {
         // It's a single file, not a directory
         return errorResponse(
-          `'${path}' is a file, not a directory. Use fetch_github_file to read it.`,
+          `'${path}' is a file, not a directory. Use fetch_github_file to read it.`
         );
       }
 
@@ -210,28 +234,26 @@ ${data.has_wiki ? `- 📚 Wiki: ${data.html_url}/wiki` : ""}
   {
     name: "get_github_releases",
     description: "Get recent releases and changelogs from a GitHub repository",
-    inputSchema: {
-      owner: z.string().describe("GitHub repository owner/organization"),
-      repo: z.string().describe("GitHub repository name"),
-      count: z
-        .number()
-        .optional()
-        .describe("Number of releases to fetch (default: 5, max: 10)"),
-    },
-    handler: async ({ owner, repo, count = 5 }) => {
+    inputSchema: releasesSchema,
+    handler: async (args) => {
+      const { owner, repo, count = 5 } = args as {
+        owner: string;
+        repo: string;
+        count?: number;
+      };
       const limit = Math.min(Math.max(1, count), 10);
       const url = `${GITHUB_API}/repos/${owner}/${repo}/releases?per_page=${limit}`;
-      const { data, error } = await fetchJson(url, {
+      const { data, error } = await fetchJson<GitHubRelease[]>(url, {
         headers: getHeaders(),
       });
 
-      if (error) {
-        return errorResponse(`Failed to fetch releases: ${error}`);
+      if (error || !data) {
+        return errorResponse(`Failed to fetch releases: ${error || "received empty response"}`);
       }
 
-      if (!data || data.length === 0) {
+      if (data.length === 0) {
         return textResponse(
-          `No releases found for ${owner}/${repo}. The project may use a different release strategy.`,
+          `No releases found for ${owner}/${repo}. The project may use a different release strategy.`
         );
       }
 
