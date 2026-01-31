@@ -59,7 +59,7 @@ export const npmTools: McpTool[] = [
       );
 
       if (error || !pkg) {
-        return errorResponse(`Failed to fetch package info: ${error}`);
+        return errorResponse(`Failed to fetch package info: ${error || "received empty response"}`);
       }
 
       // Fetch download stats
@@ -137,7 +137,7 @@ ${pkg.maintainers?.map((m) => m.name).join(", ") || "Unknown"}
       const { data, error } = await fetchJson<NpmSearchResult>(url);
 
       if (error || !data) {
-        return errorResponse(`Failed to search npm: ${error}`);
+        return errorResponse(`Failed to search npm: ${error || "received empty response"}`);
       }
 
       if (!data.objects || data.objects.length === 0) {
@@ -173,7 +173,7 @@ ${index + 1}. **${pkg.name}** (v${pkg.version})
       );
 
       if (error || !pkg) {
-        return errorResponse(`Failed to fetch package: ${error}`);
+        return errorResponse(`Failed to fetch package: ${error || "received empty response"}`);
       }
 
       if (!pkg.time) {

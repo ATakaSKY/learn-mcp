@@ -56,7 +56,7 @@ export const docsTools: McpTool[] = [
       const { data: html, error } = await fetchText(url);
 
       if (error || !html) {
-        return errorResponse(`Failed to fetch URL: ${error}`);
+        return errorResponse(`Failed to fetch URL: ${error || "received empty response"}`);
       }
 
       try {
@@ -118,7 +118,7 @@ ${truncate(article.textContent, 8000)}
       const { data, error } = await fetchJson<MdnSearchResult>(url);
 
       if (error || !data) {
-        return errorResponse(`Failed to search MDN: ${error}`);
+        return errorResponse(`Failed to search MDN: ${error || "received empty response"}`);
       }
 
       if (!data.documents || data.documents.length === 0) {

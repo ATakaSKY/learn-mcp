@@ -141,7 +141,7 @@ export const githubTools: McpTool[] = [
       );
 
       if (error || !data) {
-        return errorResponse(`Failed to fetch repo info: ${error}`);
+        return errorResponse(`Failed to fetch repo info: ${error || "received empty response"}`);
       }
 
       // Fetch languages
@@ -204,7 +204,7 @@ ${data.has_wiki ? `- 📚 Wiki: ${data.html_url}/wiki` : ""}
       });
 
       if (error || !data) {
-        return errorResponse(`Failed to list contents: ${error}`);
+        return errorResponse(`Failed to list contents: ${error || "received empty response"}`);
       }
 
       if (!Array.isArray(data)) {
@@ -248,7 +248,7 @@ ${data.has_wiki ? `- 📚 Wiki: ${data.html_url}/wiki` : ""}
       });
 
       if (error || !data) {
-        return errorResponse(`Failed to fetch releases: ${error}`);
+        return errorResponse(`Failed to fetch releases: ${error || "received empty response"}`);
       }
 
       if (data.length === 0) {
