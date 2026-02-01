@@ -32,34 +32,47 @@ Add to your `.cursor/mcp.json`:
 
 ### GitHub Tools
 
-| Tool | What to ask |
-|------|-------------|
-| `fetch_github_readme` | "Fetch the README from TanStack/query" |
-| `fetch_github_file` | "Get the package.json from facebook/react" |
-| `get_repo_info` | "How many stars does vercel/next.js have?" |
-| `list_repo_contents` | "What files are in the src folder of TanStack/router?" |
-| `get_github_releases` | "What's new in the latest releases of prisma/prisma?" |
+| Tool                  | What to ask                                            |
+| --------------------- | ------------------------------------------------------ |
+| `fetch_github_readme` | "Fetch the README from TanStack/query"                 |
+| `fetch_github_file`   | "Get the package.json from facebook/react"             |
+| `get_repo_info`       | "How many stars does vercel/next.js have?"             |
+| `list_repo_contents`  | "What files are in the src folder of TanStack/router?" |
+| `get_github_releases` | "What's new in the latest releases of prisma/prisma?"  |
 
 ### npm Tools
 
-| Tool | What to ask |
-|------|-------------|
-| `get_npm_package` | "Tell me about the zod package" |
-| `search_npm_packages` | "Find React form libraries" |
+| Tool                   | What to ask                                      |
+| ---------------------- | ------------------------------------------------ |
+| `get_npm_package`      | "Tell me about the zod package"                  |
+| `search_npm_packages`  | "Find React form libraries"                      |
 | `get_package_versions` | "When was the last version of express released?" |
 
 ### Documentation Tools
 
-| Tool | What to ask |
-|------|-------------|
+| Tool                | What to ask                                                 |
+| ------------------- | ----------------------------------------------------------- |
 | `fetch_url_content` | "Fetch the Quick Start guide from https://tanstack.com/..." |
-| `search_mdn` | "How does Promise.allSettled work?" |
+| `search_mdn`        | "How does Promise.allSettled work?"                         |
+
+## Testing
+
+```bash
+# Run tests once
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+```
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `PORT` | Server port (default: 3000) |
+| Variable       | Description                                                        |
+| -------------- | ------------------------------------------------------------------ |
+| `PORT`         | Server port (default: 3000)                                        |
 | `GITHUB_TOKEN` | Optional GitHub token for higher API rate limits (60/hr → 5000/hr) |
 
 ## Deployment
@@ -76,9 +89,6 @@ docker run -p 3000:3000 docs-fetcher-mcp
 Works with any Docker-compatible platform:
 
 ```bash
-# Fly.io
-fly launch && fly deploy
-
 # Render / Railway
 # Connect your GitHub repo - auto-detects Dockerfile
 ```
